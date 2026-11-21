@@ -66,6 +66,9 @@ const db = mongoClient.db("full-project-client")
 const paymentCollection = db.collection("payment");
 const userCollection = db.collection("user");
 const wishlistCollections = db.collection("wishlist");
+const OrderCollections = db.collection("bookings");
+
+
 
 
 //  for add equipments
@@ -157,7 +160,7 @@ res.send(result);
 
 
 // for customers
-// bookings page
+// payment and success page
 app.post("/api/checkout_sessions", async (req, res) => {
   try {
     const paymentData = req.body;
@@ -209,6 +212,88 @@ app.get("/api/customer/payment", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 }); 
+// customer myrental and seller rental euipment page
+// Orders for all
+app.post('/api/orders', async(req,res) =>{
+  const ordersData = req.body
+  const result = await OrderCollections.insertOne(ordersData)
+  res.json(result)
+})
+// code for session checking for duplicate order--
+
+app.get('/api/orders', async (req, res) => {
+  try {
+    const { sessionId } = req.query;
+
+    if (!sessionId) {
+      return res.status(400).json({ error: 'Session ID is required' });
+    }
+
+    // MongoDB তে চেক করা এই sessionId দিয়ে কোনো অর্ডার আছে কিনা
+    const existingOrder = await OrderCollections.findOne({ sessionId });
+
+    if (existingOrder) {
+      // ফ্রন্টএন্ড অ্যারে আশা করছে, তাই অ্যারে রিটার্ন করছি
+      return res.json([existingOrder]);
+    } else {
+      // অর্ডার না থাকলে খালি অ্যারে রিটার্ন করছি
+      return res.json([]);
+    }
+
+  } catch (error) {
+    console.error('❌ Error checking existing order:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Customer order page a data ake payemnt orderdata thake asbe
+app.get("/api/customer/myorders/:userId", async(req, res) => {
+  // const { customerId } = req.query;
+  // const  userId  = req.user?.id || customerId;
+  // const result = await OrderCollections.find({ customerId:userId}).toArray();
+  // res.json(result);
+try {
+    const { userId } = req.params;
+    if (!userId) return res.status(400).json({ error: 'userId required' });
+
+    const result = await OrderCollections.find({ customerId: userId }).toArray();
+    res.json(result);
+  } catch (err) {
+    console.error('❌ myorders error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+
+});
+ 
+
+// buyerOreder page delete
+   //   // for update bookingdelete 
+ app.patch("/api/orders/:id", async(req, res) =>{
+const {id} = req.params;
+ const { orderStatus } = req.body;
+//  console.log("placeId", id);
+// //  if get id then go to mongodoc for delete query
+// // for particular id selection 
+// const query = {_id : new ObjectId(id)}
+
+ // Validate the incoming status
+    const validStatuses = ["pending", "approved", "cancelled"];
+    if (!validStatuses.includes(orderStatus)) {
+      return res.status(400).json({ error: "Invalid status value" });
+    }
+
+const result = await OrderCollections.updateOne(
+  {_id:new ObjectId(id)},
+// { $set: { status: "cancelled"}}
+{ $set: { orderStatus}}
+)
+// console.log(result);
+res.json(result)
+
+ });
+
+
+
 
 app.get('/', (req, res) => {
   res.send('Hello World!')
