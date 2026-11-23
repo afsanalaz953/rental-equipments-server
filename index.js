@@ -415,6 +415,50 @@ res.json(result)
  })
 
 
+//Admin rental/order management api
+   app.get("/api/admin/allorders", async(req, res)=>{
+
+  // search
+  try {
+    const { orderId, search } = req.query;
+
+    let filter = {};
+
+    // 🔹 _id দিয়ে search
+    if (orderId && orderId.trim() !== '') {
+      if (ObjectId.isValid(orderId)) {
+        filter._id = new ObjectId(orderId);
+      } else {
+        return res.status(400).json({ message: 'Invalid orderId' });
+      }
+    }
+
+    // 🔹 text search (title / orderStatus / customerEmail / buyerName ইত্যাদি)
+    if (search && search.trim() !== '') {
+      const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.$or = [
+        { title:       { $regex: safeSearch, $options: 'i' } },
+        { orderStatus: { $regex: safeSearch, $options: 'i' } },
+       
+        { buyerName:   { $regex: safeSearch, $options: 'i' } },
+        { sellerName:  { $regex: safeSearch, $options: 'i' } },
+        { productId:   { $regex: safeSearch, $options: 'i' } },
+      ];
+    }
+
+    const result = await OrderCollections
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
 
 app.get('/', (req, res) => {
   res.send('Hello World!')
