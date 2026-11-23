@@ -440,8 +440,8 @@ res.json(result)
         { title:       { $regex: safeSearch, $options: 'i' } },
         { orderStatus: { $regex: safeSearch, $options: 'i' } },
        
-        { buyerName:   { $regex: safeSearch, $options: 'i' } },
-        { sellerName:  { $regex: safeSearch, $options: 'i' } },
+        { customerName:   { $regex: safeSearch, $options: 'i' } },
+        { ownerName:  { $regex: safeSearch, $options: 'i' } },
         { productId:   { $regex: safeSearch, $options: 'i' } },
       ];
     }
@@ -457,6 +457,36 @@ res.json(result)
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+// admin user manage page
+app.get("/api/admin/users", async(req, res)=>{
+    // res.send('hello server running')
+  //  const {userId} = req.query;
+//   const result = await userCollection.find({ role: { $ne: 'admin'}}).toArray();
+//  res.json(result)
+  try {
+    const { search } = req.query; // কুয়েরি থেকে search নিন
+
+    let filter = { role: { $ne: 'admin' } }; // অ্যাডমিন বাদ
+
+    // যদি search থাকে, তাহলে নাম বা ইমেইলে খুঁজুন
+    if (search && search.trim() !== '') {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const result = await userCollection.find(filter).toArray();
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+
+
+})
+
 
 
 
