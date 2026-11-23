@@ -292,6 +292,127 @@ res.json(result)
 
  });
 
+ //  for customers wishlist 
+app.post('/api/wishlist', async(req,res) =>{
+ const { equipmentData, equipmentId, customerId} = req.body;
+//  const { sessionId, status, customerEmail, metadata, createdAt } = req.body;
+// const wishlistData = req.body;
+const wishlistData = {
+    equipmentData,
+    equipmentId,
+       customerId,
+       
+    addedAt: new Date()
+  };
+  console.log(wishlistData, "customers wishData");
+  
+  const result = await wishlistCollections.insertOne(wishlistData)
+  res.json(result)
+})
+// Buyer wishlist page api. 1ta 1ta kore data phathano mongo thake
+ app.get("/api/wishlist/:userId", async(req, res)=>{
+    // res.send('hello server running')
+  //  const {customerId} = req.query;
+   const userId = req.user?.id || req.params.userId || req.query?.customerId;
+  //  const userId = req.user?.id;
+  //  const {productId} =req.body;
+  //  const {productId} = productData._id;
+   console.log('buyerwishlistuserId', userId)
+const result = await wishlistCollections.find({customerId: userId }).toArray();
+ res.json(result)
+})
+
+// wishlist delete
+app.delete("/api/wishlist/:id", async(req, res) =>{
+const {id} = req.params;
+console.log(req.params, "wishlistdeleteid")
+
+// // //  if get id then go to mongodoc for delete query
+// // // for particular id selection 
+//  const query = {_id : new ObjectId()}
+ const result = await wishlistCollections.deleteOne({_id:new ObjectId(id)});
+
+res.json(result)
+ })
+
+//  Admin  Admin >>>>>>Admin>>
+// allequipments
+app.get('/api/admin/products/all', async (req, res) => {
+  const result = await allEquipCollections.find({}).toArray();
+  res.json(result);
+});
+// title dia search
+app.get('/api/admin/products', async (req, res) =>{
+const {title} = req.query;
+const result = await allEquipCollections.find({title}).toArray();
+res.json(result) 
+ }); 
+
+
+//  Admin products update for pending and approved
+app.patch("/api/products/status/:adminproductid", async (req, res) => {
+const {adminproductid} = req.params;
+const updatedAdminProductData = req.body
+console.log(updatedAdminProductData, "adminupdatedproduct")
+
+ const filter = {_id: new ObjectId(adminproductid)};
+ const updatedAdminStatus = {
+ $set: {
+  status: updatedAdminProductData.status
+  }
+}
+const result = await allEquipCollections.updateOne(filter,updatedAdminStatus) 
+res.json(result);
+ })
+
+//  Admin product edit (name / price / category)
+app.patch("/api/admin/:adminproductid", async (req, res) => {
+  try {
+    const { adminproductid } = req.params;
+    const updates = req.body || {};
+
+    const allowed = {};
+    if (updates.title !== undefined) allowed.title = updates.title;
+    if (updates.equipmentName !== undefined) allowed.equipmentName = updates.equipmentName;
+    if (updates.category !== undefined) allowed.category = updates.category;
+    if (updates.status !== undefined) allowed.status = updates.status;
+    if (updates.price !== undefined) {
+      const price = Number(updates.price);
+      if (Number.isNaN(price)) return res.status(400).json({ message: "Invalid price" });
+      allowed.price = price;
+    }
+
+    if (Object.keys(allowed).length === 0) {
+      return res.status(400).json({ message: "No valid fields to update" });
+    }
+
+    const result = await allEquipCollections.updateOne(
+      { _id: new ObjectId(adminproductid) },
+      { $set: allowed }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("admin product edit error:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+})
+
+//  admin rejected power
+app.delete("/api/admin/:rejectedproductid", async(req, res) =>{
+const {rejectedproductid} = req.params;
+
+// // //  if get id then go to mongodoc for delete query
+// // // for particular id selection 
+//  const query = {_id : new ObjectId()}
+ const result = await allEquipCollections.deleteOne({_id:new ObjectId(rejectedproductid)});
+
+res.json(result)
+ })
 
 
 
