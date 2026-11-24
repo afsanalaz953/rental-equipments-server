@@ -70,10 +70,12 @@ const OrderCollections = db.collection("bookings");
 
 
 
-
+// owner api data
 //  for add equipments
 app.post('/owner/addequipments', async(req, res)=> {
-  const addData = req.body
+  const addData = {...req.body, 
+    createdAt: new Date(),
+  }
   const result = await allEquipCollections.insertOne(addData)
   console.log("serveradddata", result)
   res.send({message: "Add api working"})
@@ -113,6 +115,31 @@ app.get('/allequipments', async (req, res) => {
     console.error('Error in /allequipments:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+// updated product api
+ app.patch("/api/owner/:productId", async (req, res) => {
+const {productId} = req.params
+const updatedData = req.body
+console.log(updatedData)
+const result = await allEquipCollections.updateOne(
+  {_id: new ObjectId(productId)},
+  {$set: updatedData}
+)
+res.json(result)
+ })
+
+ // productId 
+// param thake productId dhore for delete
+app.delete("/api/owner/:productId", async(req, res) =>{
+const {productId} = req.params;
+
+// // //  if get id then go to mongodoc for delete query
+// // // for particular id selection 
+//  const query = {_id : new ObjectId(id)}
+ const result = await allEquipCollections.deleteOne({_id:new ObjectId(productId)});
+
+res.json(result)
+
 });
 
 // Equip Details page
@@ -338,15 +365,17 @@ res.json(result)
 //  Admin  Admin >>>>>>Admin>>
 // allequipments
 app.get('/api/admin/products/all', async (req, res) => {
+
   const result = await allEquipCollections.find({}).toArray();
   res.json(result);
 });
-// title dia search
-app.get('/api/admin/products', async (req, res) =>{
-const {title} = req.query;
-const result = await allEquipCollections.find({title}).toArray();
-res.json(result) 
- }); 
+// // title dia search
+// app.get('/api/admin/products', async (req, res) =>{
+// const {title} = req.query;
+// const result = await allEquipCollections.find({title}).toArray();
+// res.json(result) 
+//  }); 
+ 
 
 
 //  Admin products update for pending and approved
@@ -483,9 +512,85 @@ app.get("/api/admin/users", async(req, res)=>{
     console.error(error);
     res.status(500).json({ message: 'Server error' });
   }
-
-
 })
+// users updated by admin
+// অ্যাডমিন ইউজার ব্লক/আনব্লক করার রাউট
+// app.patch("/api/admin/user/:id/role", async (req, res) => {
+ 
+//     const { id } = req.params;
+//     const query = {_id: new ObjectId(id)};
+//     const updatedDoc = {
+//       $set:{
+//         role:req.body.role,
+//       }
+//     }
+
+//     // MongoDB-তে আপডেট করো (এখানে user ভেরিয়েবল লাগবে না, ডাইরেক্ট আপডেট)
+//     const result = await userCollection.updateOne(query, updatedDoc);
+//     res.send(result)
+//   });
+// auth middleware (আপনার existing auth system-এর সাথে adjust করুন)
+const requireAdmin = (req, res, next) => {
+  const user = req.user;               // auth middleware থেকে আসা user
+  if (!user) return res.status(401).json({ message: "Unauthorized" });
+  if (user.role !== "admin") {
+    return res.status(403).json({ message: "Only admin can change roles" });
+  }
+  next();
+};
+
+app.patch("/api/admin/user/:id/role", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    const allowedRoles = ["customer", "admin", "owner"];
+    if (!role || !allowedRoles.includes(role)) {
+      return res.status(400).json({ message: "Invalid role" });
+    }
+
+    // 1) নিজের role নিজে change করা যাবে না (lockout প্রতিরোধ)
+    const currentUserId = req.user.id || req.user._id;
+    if (String(currentUserId) === String(id)) {
+      return res
+        .status(403)
+        .json({ message: "You cannot change your own role" });
+    }
+
+    const query = { _id: new ObjectId(id) };
+    const existing = await userCollection.findOne(query);
+    if (!existing) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // 2) শেষ admin-কে demote করা যাবে না
+    if (existing.role === "admin" && role !== "admin") {
+      const adminCount = await userCollection.countDocuments({
+        role: "admin",
+      });
+      if (adminCount <= 1) {
+        return res
+          .status(403)
+          .json({ message: "Cannot demote the last admin" });
+      }
+    }
+
+    // (আপনার আগের "owner cannot be changed" block সরিয়ে দেওয়া হয়েছে,
+    //  কারণ আপনার logic অনুযায়ী admin সব role-ই পরিবর্তন করতে পারে)
+
+    await userCollection.updateOne(query, { $set: { role } });
+
+    return res.status(200).json({ message: `User role updated to ${role}` });
+  } catch (err) {
+    console.error("Role update error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+   
+
+
+
+
 
 
 
