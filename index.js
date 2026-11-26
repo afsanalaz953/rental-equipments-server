@@ -68,6 +68,47 @@ const userCollection = db.collection("user");
 const wishlistCollections = db.collection("wishlist");
 const OrderCollections = db.collection("bookings");
 
+// For Homepage
+// api for category
+// category r array creation
+app.get("/api/categories", async (req, res) => {
+  try {
+    // Product মডেল থেকে সব ডকুমেন্টের মধ্যে unique category নামগুলো বের করি
+    const categories = await allEquipCollections
+    .aggregate([
+        { $group: { _id: "$category" } },   // ক্যাটাগরি অনুযায়ী গ্রুপ
+        { $project: { _id: 0, name: "$_id" } } // ফরম্যাট ঠিক করা
+      ])
+      .toArray();
+        res.status(200).json(categories);
+  } catch (error) {
+    console.error("Category Filter Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+// product filter according to category
+app.get("/api/products", async (req, res) => {
+  try {
+    // ইউআরএল থেকে query parameter নিয়ে নিই (যেমন: ?category=Electronics)
+    const { category } = req.query;
+
+    // ফিল্টার অবজেক্ট তৈরি করি
+    let filter = {};
+    if (category) {
+      filter.category = category; // যদি category পাঠানো হয়, তাহলে শুধু ওই ক্যাটাগরির প্রোডাক্ট আনি
+    }
+
+    // ডাটাবেজ থেকে প্রোডাক্ট খুঁজি
+    const products = await allEquipCollections.find(filter).toArray();
+
+    // ফলাফল ক্লায়েন্টকে পাঠাই
+    res.status(200).json(products);
+  } catch (error) {
+    console.error("Product Filter Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 
 
 // owner api data
