@@ -5,7 +5,7 @@ import cors from 'cors';
 import { MongoClient } from 'mongodb';
 import { ObjectId } from 'mongodb';
 
-// import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 const app = express()
 app.use(express.json());
@@ -25,41 +25,55 @@ export async function connectToMongoDB() {
 
 
 // verify Token
-//  const verifyToken = async(req, res, next) =>{
-//   const authHeader= req?.headers.authorization
+ const verifyToken = async(req, res, next) =>{
+  const authHeader= req?.headers.authorization
   
-//     if(!authHeader){
-//     return res.status(401).json({message:
-//     "Unauthorized"
-//     });
-//   }
-//    console.log (authHeader, "auth")
-//  const token = authHeader.split(" ")[1];
-//   console.log(token)
-//  if(!token){
-//     return res.status(401).json({message:
-//        "Unauthorized"
-//     });
-//  }
-//  // verification by JWKS
-// const JWKS = createRemoteJWKSet(
-//  new URL(`${process.env.CLIENT_URL}/api/auth/jwks`)
-//   )
-// // // payload in try catch
-//  try {
+    if(!authHeader){
+    return res.status(401).json({message:
+    "Unauthorized"
+    });
+  }
+   console.log (authHeader, "auth")
+ const token = authHeader.split(" ")[1];
+  console.log(token)
+ if(!token){
+    return res.status(401).json({message:
+       "Unauthorized"
+    });
+ }
+//   JWKS set
+const JWKS = createRemoteJWKSet(
+ new URL(`${process.env.CLIENT_URL}/api/auth/jwks`)
+  )
+// // payload in try catch
+ try {
   
-//     // const JWKS = await getJWKS();   // <---- এই লাইনটি বসবে
-//  const { payload } = await jwtVerify(token, JWKS) 
-//    console.log(payload, "payload");
-//      next()
-//   } catch (error) {
-//      console.log(error);
-//      return res.status(403).json({message:
-//       "Forbidden"
-//       });
-//   }
-//  };
+    // const JWKS = await getJWKS();   // <---- এই লাইনটি বসবে
+ const { payload } = await jwtVerify(token, JWKS) 
+   console.log(payload, "payload");
+  //  newly added line for getting admin users
+    req.user = payload; 
+     next()
+  } catch (error) {
+     console.log(error);
+     return res.status(403).json({message:
+      "Forbidden"
+      });
+  }
+ };
 //  verification end
+
+// // admin verify
+const adminVerify = async(req, res, next) => {
+  const user = req.user;
+  if (!user || user.role !== 'admin') {
+    return res.status(403).json({msg:"Forbidden"})
+  }
+   console.log('User from adminVerifytoken:', user);
+  next()   
+}
+
+
 const mongoClient = await connectToMongoDB()
 const db = mongoClient.db("full-project-client")
  const allEquipCollections = db.collection("addequipments");
@@ -200,7 +214,7 @@ res.json(result)
 })
 
 // Equip Details page
-app.get('/equipments/:id', async(req,res) =>{
+app.get('/equipments/:id', verifyToken, async(req,res) =>{
   const {id} =req.params;
   const result = await allEquipCollections.findOne({_id:new ObjectId(id)})
  console.log(id, 'equipid')
@@ -593,7 +607,7 @@ res.json(result)
 });
 
 // admin user manage page
-app.get("/api/admin/users", async(req, res)=>{
+app.get("/api/admin/users",verifyToken, adminVerify, async(req, res)=>{
     // res.send('hello server running')
   //  const {userId} = req.query;
 //   const result = await userCollection.find({ role: { $ne: 'admin'}}).toArray();
@@ -618,22 +632,47 @@ app.get("/api/admin/users", async(req, res)=>{
     res.status(500).json({ message: 'Server error' });
   }
 })
-// users updated by admin
-// অ্যাডমিন ইউজার ব্লক/আনব্লক করার রাউট
-// app.patch("/api/admin/user/:id/role", async (req, res) => {
- 
-//     const { id } = req.params;
-//     const query = {_id: new ObjectId(id)};
-//     const updatedDoc = {
-//       $set:{
-//         role:req.body.role,
-//       }
+// 
+// app.patch(
+//   "/api/admin/user/:userId/role",
+//   verifyToken,
+//   adminVerify,
+//   async (req, res) => {
+//     console.log("HIT:", req.params.userId, req.body);  // debug
+//     const { userId } = req.params;
+//     const { role } = req.body;
+
+//     if (!["customer", "admin", "owner"].includes(role)) {
+//       return res.status(400).json({ message: "Invalid role" });
+//     }
+//     // নিজের role বদলানো block
+//     if (req.user.id === userId) {
+//       return res.status(403).json({ message: "Cannot change own role" });
 //     }
 
-//     // MongoDB-তে আপডেট করো (এখানে user ভেরিয়েবল লাগবে না, ডাইরেক্ট আপডেট)
-//     const result = await userCollection.updateOne(query, updatedDoc);
-//     res.send(result)
-//   });
+//     await userCollection.updateOne(
+//       { _id: new ObjectId(userId) },
+//       { $set: { role } }
+//     );
+//     res.json({ success: true });
+//   }
+// );
+// users updated by admin
+// অ্যাডমিন ইউজার ব্লক/আনব্লক করার রাউট
+app.patch("/api/admin/user/:id/role", verifyToken, adminVerify, async (req, res) => {
+ 
+    const { id } = req.params;
+    const query = {_id: new ObjectId(id)};
+    const updatedDoc = {
+      $set:{
+        role:req.body.role,
+      }
+    }
+
+    // MongoDB-তে আপডেট করো (এখানে user ভেরিয়েবল লাগবে না, ডাইরেক্ট আপডেট)
+    const result = await userCollection.updateOne(query, updatedDoc);
+    res.send(result)
+  });
 // auth middleware (আপনার existing auth system-এর সাথে adjust করুন)
 const requireAdmin = (req, res, next) => {
   const user = req.user;               // auth middleware থেকে আসা user
