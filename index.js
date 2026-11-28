@@ -93,7 +93,9 @@ app.get("/api/products", async (req, res) => {
     const { category } = req.query;
 
     // ফিল্টার অবজেক্ট তৈরি করি
-    let filter = {};
+    //  let filter = { status: "Approved" };
+  
+    let filter = {status: "Approved"};
     if (category) {
       filter.category = category; // যদি category পাঠানো হয়, তাহলে শুধু ওই ক্যাটাগরির প্রোডাক্ট আনি
     }
@@ -108,6 +110,12 @@ app.get("/api/products", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+// Featured section of home
+app.get('/featured', async(req, res) =>{
+const result = await allEquipCollections.find({status: "Approved"}).sort({ _id: -1 }).limit(6).toArray()
+res.json(result);
+ })
 
 
 
@@ -129,7 +137,7 @@ app.get('/allequipments', async (req, res) => {
     const search = String(req.query.search || "").trim();
     const category = String(req.query.category || "").trim();
 
-    const query = {};
+    const query = {status: "Approved"};
 
     // 🔎 নাম দিয়ে search (title = legacy shape, equipmentName = current shape)
     if (search) {
@@ -182,6 +190,14 @@ const {productId} = req.params;
 res.json(result)
 
 });
+
+// //  owner manageorders api
+ app.get("/api/owner/orders", async(req, res)=>{
+    
+   const {ownerId} = req.query;
+ const result = await OrderCollections.find({ownerId}) .sort({ createdAt: -1 }) .toArray();
+ res.json(result)
+})
 
 // Equip Details page
 app.get('/equipments/:id', async(req,res) =>{
@@ -280,6 +296,47 @@ app.get("/api/customer/payment", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 }); 
+
+// payment r por Stock kome jabe
+// 5. Atomically decrease availableStock by 1
+// stock kome jasse start
+ app.patch("/api/products/:id", async (req, res) => {
+const {id} = req.params
+// const updatedData = req.body
+// console.log(updatedData)
+// const result = await addproductCollection.updateOne(
+//   {_id: new ObjectId(id)},
+//   { $inc: { stock: -1 } }
+// )
+// res.json(result)
+
+const { quantity } = req.body;
+  const quantityNum = parseInt(quantity, 10);
+  if (!quantityNum || quantityNum < 1) {
+    return res.status(400).json({ message: 'Invalid quantity' });
+  }
+
+  try {
+    const result = await allEquipCollections.updateOne(
+      { _id: new ObjectId(id) },
+      { $inc: { stock: -quantityNum } } // কুয়ান্টিটি অনুযায়ী কমবে
+  //      [
+  //   { $set: { stock: { $subtract: [{ $toInt: "$stock" }, quantity] } } }
+  // ]
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    res.json({ success: true, result });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ Stockmessage: 'Server error' });
+  }
+});
+
+
 // customer myrental and seller rental euipment page
 // Orders for all
 app.post('/api/orders', async(req,res) =>{
@@ -416,6 +473,13 @@ app.get('/api/admin/products/all', async (req, res) => {
 // const result = await allEquipCollections.find({title}).toArray();
 // res.json(result) 
 //  }); 
+
+// admin all orders(search sara)
+app.get('/api/admin/allorders', async (req, res) => {
+
+  const result = await OrderCollections.find({}).toArray();
+  res.json(result);
+});
  
 
 
